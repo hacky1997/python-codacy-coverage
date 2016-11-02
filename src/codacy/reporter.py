@@ -55,7 +55,7 @@ def file_exists(rootdir, filename):
             return True
         else:
             for subFolder in subFolders:
-                return file_exists(subFolder, filename)
+                return file_exists(os.path.join(rootdir, subFolder), filename)
             return False
 
 
