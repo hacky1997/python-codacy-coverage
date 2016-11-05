@@ -35,7 +35,7 @@ You can install the coverage reporter by running:
 Updating Codacy
 ---------------
 
-To update Codacy, you will need your project API token. You can find the token in Project -> Settings -> Integrations -> Project API.
+To update Codacy, you will need your project API token. You can create the token in `Project -> Settings -> Integrations -> Add Integration -> Project API`
 
 Then set it in your terminal, replacing %Project_Token% with your own token:
 
