@@ -89,13 +89,14 @@ def merge_reports(report_list):
         # TODO: What should we do if there is a file listed multiple times?
         final_report['fileReports'] += report['fileReports']
 
-    # Gather all per-file coverage
-    total_coverages = []
-    for fileentry in final_report['fileReports']:
-        total_coverages += [fileentry['total']]
+    # Coverage weighted average (by number of lines of code) of all files
+    total_lines = 0
+    average_sum = 0
+    for file_entry in final_report['fileReports']:
+        average_sum += file_entry['total'] * file_entry['codeLines']
+        total_lines += file_entry['codeLines']
 
-    # And average
-    final_report['total'] = int(sum(total_coverages)/len(total_coverages))
+    final_report['total'] = int(round(average_sum / total_lines))
 
     return final_report
 
@@ -121,12 +122,13 @@ def parse_report_file(report_file, git_directory):
     sources = [x.firstChild.nodeValue for x in report_xml.getElementsByTagName('source')]
     classes = report_xml.getElementsByTagName('class')
     for cls in classes:
+        lines = cls.getElementsByTagName('line')
         file_report = {
             'filename': generate_filename(sources, cls.attributes['filename'].value, git_directory),
             'total': percent(cls.attributes['line-rate'].value),
+            'codeLines': len(lines),
             'coverage': {},
         }
-        lines = cls.getElementsByTagName('line')
         for line in lines:
             hits = int(line.attributes['hits'].value)
             if hits >= 1:
