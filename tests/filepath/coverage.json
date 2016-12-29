@@ -3,6 +3,7 @@
   "fileReports": [
     {
       "total": 66,
+      "codeLines": 3,
       "coverage": {
         "1": 1,
         "4": 1
@@ -11,6 +12,7 @@
     },
     {
       "total": 49,
+      "codeLines": 59,
       "coverage": {
         "50": 1,
         "60": 1,
