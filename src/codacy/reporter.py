@@ -99,11 +99,12 @@ def merge_and_round_reports(report_list):
             average_sum += file_entry['total'] * file_entry['codeLines']
             total_lines += file_entry['codeLines']
 
-        final_report['total'] = int(floor(average_sum / total_lines))
+        final_report['total'] = average_sum / total_lines
 
     # Round all total values
     for file_entry in final_report['fileReports']:
         file_entry['total'] = int(floor(file_entry['total']))
+    final_report['total'] = int(floor(final_report['total']))
 
     return final_report
 
