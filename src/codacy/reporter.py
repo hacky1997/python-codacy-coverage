@@ -23,7 +23,6 @@ BAD_REQUEST = 400
 
 
 class _Retry(urllib3_util.Retry):
-
     def is_forced_retry(self, method, status_code):
         return status_code >= BAD_REQUEST
 
@@ -76,27 +75,35 @@ def generate_filename(sources, filename, git_directory):
     return filename
 
 
-def merge_reports(report_list):
-    """Merges together several report structures from parse_report_file"""
-    final_report = {
-        'language': "python",
-        'fileReports': []
-    }
+def merge_and_round_reports(report_list):
+    """Merges together several report structures from parse_report_file (and rounds all values)"""
 
-    for report in report_list:
-        # First, merge together detailed report structures
-        # This assumes no overlap
-        # TODO: What should we do if there is a file listed multiple times?
-        final_report['fileReports'] += report['fileReports']
+    if len(report_list) == 1:
+        final_report = report_list[0]
+    else:
+        final_report = {
+            'language': "python",
+            'fileReports': []
+        }
 
-    # Coverage weighted average (by number of lines of code) of all files
-    total_lines = 0
-    average_sum = 0
+        for report in report_list:
+            # First, merge together detailed report structures
+            # This assumes no overlap
+            # TODO: What should we do if there is a file listed multiple times?
+            final_report['fileReports'] += report['fileReports']
+
+        # Coverage weighted average (by number of lines of code) of all files
+        total_lines = 0
+        average_sum = 0
+        for file_entry in final_report['fileReports']:
+            average_sum += file_entry['total'] * file_entry['codeLines']
+            total_lines += file_entry['codeLines']
+
+        final_report['total'] = int(floor(average_sum / total_lines))
+
+    # Round all total values
     for file_entry in final_report['fileReports']:
-        average_sum += file_entry['total'] * file_entry['codeLines']
-        total_lines += file_entry['codeLines']
-
-    final_report['total'] = int(round(average_sum / total_lines))
+        file_entry['total'] = int(floor(file_entry['total']))
 
     return final_report
 
@@ -106,9 +113,9 @@ def parse_report_file(report_file, git_directory):
     :param report_file:
     """
 
-    # Convert decimal string to floored int percent value
+    # Convert decimal string to floored decimal percent value
     def percent(s):
-        return int(floor(float(s) * 100))
+        return float(s) * 100
 
     # Parse the XML into the format expected by the API
     report_xml = minidom.parse(report_file)
@@ -199,7 +206,7 @@ def run():
         logging.info("Parsing report file %s...", rfile)
         reports.append(parse_report_file(rfile, args.directory))
 
-    report = merge_reports(reports)
+    report = merge_and_round_reports(reports)
 
     logging.info("Uploading report...")
     upload_report(report, CODACY_PROJECT_TOKEN, args.commit)
