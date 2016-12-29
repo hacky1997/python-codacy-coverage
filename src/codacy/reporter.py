@@ -86,20 +86,21 @@ def merge_and_round_reports(report_list):
             'fileReports': []
         }
 
+        total_lines = 0
         for report in report_list:
             # First, merge together detailed report structures
             # This assumes no overlap
             # TODO: What should we do if there is a file listed multiple times?
             final_report['fileReports'] += report['fileReports']
+            total_lines += report['codeLines']
 
         # Coverage weighted average (by number of lines of code) of all files
-        total_lines = 0
         average_sum = 0
         for file_entry in final_report['fileReports']:
             average_sum += file_entry['total'] * file_entry['codeLines']
-            total_lines += file_entry['codeLines']
 
         final_report['total'] = average_sum / total_lines
+        final_report['codeLines'] = total_lines
 
     # Round all total values
     for file_entry in final_report['fileReports']:
@@ -129,8 +130,10 @@ def parse_report_file(report_file, git_directory):
 
     sources = [x.firstChild.nodeValue for x in report_xml.getElementsByTagName('source')]
     classes = report_xml.getElementsByTagName('class')
+    total_lines = 0
     for cls in classes:
         lines = cls.getElementsByTagName('line')
+        total_lines += len(lines)
         file_report = {
             'filename': generate_filename(sources, cls.attributes['filename'].value, git_directory),
             'total': percent(cls.attributes['line-rate'].value),
@@ -143,6 +146,8 @@ def parse_report_file(report_file, git_directory):
                 # The API assumes 0 if a line is missing
                 file_report['coverage'][line.attributes['number'].value] = hits
         report['fileReports'] += [file_report]
+
+    report['codeLines'] = total_lines
 
     return report
 
