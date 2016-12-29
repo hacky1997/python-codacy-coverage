@@ -6,7 +6,6 @@ import json
 import logging
 import os
 from xml.dom import minidom
-from math import floor
 
 import requests
 from requests.packages.urllib3 import util as urllib3_util
@@ -104,8 +103,8 @@ def merge_and_round_reports(report_list):
 
     # Round all total values
     for file_entry in final_report['fileReports']:
-        file_entry['total'] = int(floor(file_entry['total']))
-    final_report['total'] = int(floor(final_report['total']))
+        file_entry['total'] = int(file_entry['total'])
+    final_report['total'] = int(final_report['total'])
 
     return final_report
 
@@ -115,7 +114,7 @@ def parse_report_file(report_file, git_directory):
     :param report_file:
     """
 
-    # Convert decimal string to floored decimal percent value
+    # Convert decimal string to decimal percent value
     def percent(s):
         return float(s) * 100
 
