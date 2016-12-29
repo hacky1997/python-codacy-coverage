@@ -6,7 +6,6 @@ import json
 import logging
 import os
 from xml.dom import minidom
-from math import floor
 
 import requests
 from requests.packages.urllib3 import util as urllib3_util
@@ -23,7 +22,6 @@ BAD_REQUEST = 400
 
 
 class _Retry(urllib3_util.Retry):
-
     def is_forced_retry(self, method, status_code):
         return status_code >= BAD_REQUEST
 
@@ -76,26 +74,37 @@ def generate_filename(sources, filename, git_directory):
     return filename
 
 
-def merge_reports(report_list):
-    """Merges together several report structures from parse_report_file"""
-    final_report = {
-        'language': "python",
-        'fileReports': []
-    }
+def merge_and_round_reports(report_list):
+    """Merges together several report structures from parse_report_file (and rounds all values)"""
 
-    for report in report_list:
-        # First, merge together detailed report structures
-        # This assumes no overlap
-        # TODO: What should we do if there is a file listed multiple times?
-        final_report['fileReports'] += report['fileReports']
+    if len(report_list) == 1:
+        final_report = report_list[0]
+    else:
+        final_report = {
+            'language': "python",
+            'fileReports': []
+        }
 
-    # Gather all per-file coverage
-    total_coverages = []
-    for fileentry in final_report['fileReports']:
-        total_coverages += [fileentry['total']]
+        total_lines = 0
+        for report in report_list:
+            # First, merge together detailed report structures
+            # This assumes no overlap
+            # TODO: What should we do if there is a file listed multiple times?
+            final_report['fileReports'] += report['fileReports']
+            total_lines += report['codeLines']
 
-    # And average
-    final_report['total'] = int(sum(total_coverages)/len(total_coverages))
+        # Coverage weighted average (by number of lines of code) of all files
+        average_sum = 0
+        for file_entry in final_report['fileReports']:
+            average_sum += file_entry['total'] * file_entry['codeLines']
+
+        final_report['total'] = average_sum / total_lines
+        final_report['codeLines'] = total_lines
+
+    # Round all total values
+    for file_entry in final_report['fileReports']:
+        file_entry['total'] = int(file_entry['total'])
+    final_report['total'] = int(final_report['total'])
 
     return final_report
 
@@ -105,9 +114,9 @@ def parse_report_file(report_file, git_directory):
     :param report_file:
     """
 
-    # Convert decimal string to floored int percent value
+    # Convert decimal string to decimal percent value
     def percent(s):
-        return int(floor(float(s) * 100))
+        return float(s) * 100
 
     # Parse the XML into the format expected by the API
     report_xml = minidom.parse(report_file)
@@ -120,19 +129,24 @@ def parse_report_file(report_file, git_directory):
 
     sources = [x.firstChild.nodeValue for x in report_xml.getElementsByTagName('source')]
     classes = report_xml.getElementsByTagName('class')
+    total_lines = 0
     for cls in classes:
+        lines = cls.getElementsByTagName('line')
+        total_lines += len(lines)
         file_report = {
             'filename': generate_filename(sources, cls.attributes['filename'].value, git_directory),
             'total': percent(cls.attributes['line-rate'].value),
+            'codeLines': len(lines),
             'coverage': {},
         }
-        lines = cls.getElementsByTagName('line')
         for line in lines:
             hits = int(line.attributes['hits'].value)
             if hits >= 1:
                 # The API assumes 0 if a line is missing
                 file_report['coverage'][line.attributes['number'].value] = hits
         report['fileReports'] += [file_report]
+
+    report['codeLines'] = total_lines
 
     return report
 
@@ -197,7 +211,7 @@ def run():
         logging.info("Parsing report file %s...", rfile)
         reports.append(parse_report_file(rfile, args.directory))
 
-    report = merge_reports(reports)
+    report = merge_and_round_reports(reports)
 
     logging.info("Uploading report...")
     upload_report(report, CODACY_PROJECT_TOKEN, args.commit)
