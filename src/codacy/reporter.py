@@ -4,11 +4,11 @@ import argparse
 import contextlib
 import json
 import logging
-import os
-from xml.dom import minidom
 
+import os
 import requests
 from requests.packages.urllib3 import util as urllib3_util
+from parsers.cobertura import parse_report_file as parse_cobertura_report_file
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
@@ -39,39 +39,6 @@ def get_git_revision_hash():
     import subprocess
 
     return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode("utf-8").strip()
-
-
-def get_git_directory():
-    import subprocess
-
-    return subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).decode("utf-8").strip()
-
-
-def file_exists(rootdir, filename):
-    for root, subFolders, files in os.walk(rootdir):
-        if filename in files:
-            return True
-        else:
-            for subFolder in subFolders:
-                return file_exists(os.path.join(rootdir, subFolder), filename)
-            return False
-
-
-def generate_filename(sources, filename, git_directory):
-    def strip_prefix(line, prefix):
-        if line.startswith(prefix):
-            return line[len(prefix):]
-        else:
-            return line
-
-    if not git_directory:
-        git_directory = get_git_directory()
-
-    for source in sources:
-        if file_exists(source, filename):
-            return strip_prefix(source, git_directory).strip("/") + "/" + filename.strip("/")
-
-    return filename
 
 
 def merge_and_round_reports(report_list):
@@ -107,48 +74,6 @@ def merge_and_round_reports(report_list):
     final_report['total'] = int(final_report['total'])
 
     return final_report
-
-
-def parse_report_file(report_file, git_directory):
-    """Parse XML file and POST it to the Codacy API
-    :param report_file:
-    """
-
-    # Convert decimal string to decimal percent value
-    def percent(s):
-        return float(s) * 100
-
-    # Parse the XML into the format expected by the API
-    report_xml = minidom.parse(report_file)
-
-    report = {
-        'language': "python",
-        'total': percent(report_xml.getElementsByTagName('coverage')[0].attributes['line-rate'].value),
-        'fileReports': [],
-    }
-
-    sources = [x.firstChild.nodeValue for x in report_xml.getElementsByTagName('source')]
-    classes = report_xml.getElementsByTagName('class')
-    total_lines = 0
-    for cls in classes:
-        lines = cls.getElementsByTagName('line')
-        total_lines += len(lines)
-        file_report = {
-            'filename': generate_filename(sources, cls.attributes['filename'].value, git_directory),
-            'total': percent(cls.attributes['line-rate'].value),
-            'codeLines': len(lines),
-            'coverage': {},
-        }
-        for line in lines:
-            hits = int(line.attributes['hits'].value)
-            if hits >= 1:
-                # The API assumes 0 if a line is missing
-                file_report['coverage'][line.attributes['number'].value] = hits
-        report['fileReports'] += [file_report]
-
-    report['codeLines'] = total_lines
-
-    return report
 
 
 def upload_report(report, token, commit):
@@ -209,7 +134,7 @@ def run():
     reports = []
     for rfile in args.report:
         logging.info("Parsing report file %s...", rfile)
-        reports.append(parse_report_file(rfile, args.directory))
+        reports.append(parse_cobertura_report_file(rfile, args.directory))
 
     report = merge_and_round_reports(reports)
 
