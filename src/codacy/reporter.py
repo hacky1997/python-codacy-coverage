@@ -141,9 +141,7 @@ def parse_report_file(report_file, git_directory):
         }
         for line in lines:
             hits = int(line.attributes['hits'].value)
-            if hits >= 1:
-                # The API assumes 0 if a line is missing
-                file_report['coverage'][line.attributes['number'].value] = hits
+            file_report['coverage'][line.attributes['number'].value] = hits
         report['fileReports'] += [file_report]
 
     report['codeLines'] = total_lines
