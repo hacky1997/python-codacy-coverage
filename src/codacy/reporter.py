@@ -53,9 +53,6 @@ def generate_filename(sources, filename, git_directory):
         else:
             return line
 
-    if not git_directory:
-        git_directory = get_git_directory()
-
     for source in sources:
         if os.path.isfile(source + "/" + filename):
             return strip_prefix(source, git_directory).strip("/") + "/" + filename.strip("/")
@@ -196,6 +193,12 @@ def run():
     if not args.report:
         args.report.append(DEFAULT_REPORT_FILE)
 
+    if args.directory:
+        git_directory = args.directory
+    else:
+        git_directory = get_git_directory()
+    git_directory.replace("\\", "/")
+
     # Explictly check ALL files before parsing any
     for rfile in args.report:
         if not os.path.isfile(rfile):
@@ -205,7 +208,7 @@ def run():
     reports = []
     for rfile in args.report:
         logging.info("Parsing report file %s...", rfile)
-        reports.append(parse_report_file(rfile, args.directory))
+        reports.append(parse_report_file(rfile, git_directory))
 
     report = merge_and_round_reports(reports)
 
