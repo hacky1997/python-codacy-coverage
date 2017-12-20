@@ -46,16 +46,6 @@ def get_git_directory():
     return subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).decode("utf-8").strip()
 
 
-def file_exists(rootdir, filename):
-    for root, subFolders, files in os.walk(rootdir):
-        if filename in files:
-            return True
-        else:
-            for subFolder in subFolders:
-                return file_exists(os.path.join(rootdir, subFolder), filename)
-            return False
-
-
 def generate_filename(sources, filename, git_directory):
     def strip_prefix(line, prefix):
         if line.startswith(prefix):
@@ -63,13 +53,11 @@ def generate_filename(sources, filename, git_directory):
         else:
             return line
 
-    if not git_directory:
-        git_directory = get_git_directory()
-
     for source in sources:
-        if file_exists(source, filename):
+        if os.path.isfile(source + "/" + filename):
             return strip_prefix(source, git_directory).strip("/") + "/" + filename.strip("/")
 
+    logging.debug("File not found: " + filename)
     return filename
 
 
@@ -127,6 +115,9 @@ def parse_report_file(report_file, git_directory):
     }
 
     sources = [x.firstChild.nodeValue for x in report_xml.getElementsByTagName('source')]
+    # replace windows style seperator with linux style seperator
+    for i in range(len(sources)):
+        sources[i] = sources[i].replace("\\", "/")
     classes = report_xml.getElementsByTagName('class')
     total_lines = 0
     for cls in classes:
@@ -202,6 +193,12 @@ def run():
     if not args.report:
         args.report.append(DEFAULT_REPORT_FILE)
 
+    if args.directory:
+        git_directory = args.directory
+    else:
+        git_directory = get_git_directory()
+    git_directory.replace("\\", "/")
+
     # Explictly check ALL files before parsing any
     for rfile in args.report:
         if not os.path.isfile(rfile):
@@ -211,7 +208,7 @@ def run():
     reports = []
     for rfile in args.report:
         logging.info("Parsing report file %s...", rfile)
-        reports.append(parse_report_file(rfile, args.directory))
+        reports.append(parse_report_file(rfile, git_directory))
 
     report = merge_and_round_reports(reports)
 
