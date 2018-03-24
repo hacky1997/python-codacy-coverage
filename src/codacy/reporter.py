@@ -164,8 +164,8 @@ def upload_report(report, token, commit):
         logging.error(response['error'])
 
 
-def run():
-    parser = argparse.ArgumentParser(description='Codacy coverage reporter for Python.')
+def run(prog=None):
+    parser = argparse.ArgumentParser(prog=prog, description='Codacy coverage reporter for Python.')
     parser.add_argument("-r", "--report", help="coverage report file",
                         default=[], type=str,
                         action='append')
